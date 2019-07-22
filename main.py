@@ -3,7 +3,6 @@ import time
 import machine
 import sht31_i2c_xbee
 
-# TEMP_OFFSET = 14.0  # 内部温度上昇
 # addr = xbee.ADDR_BROADCAST # ブロードキャスト用のアドレス
 addr = xbee.ADDR_COORDINATOR  # cordinatorのアドレス
 
