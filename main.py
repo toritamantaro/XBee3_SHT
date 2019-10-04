@@ -1,15 +1,20 @@
 import xbee
 import time
 import machine
-import sht31_i2c_xbee
+import json
+import sht21_i2c_xbee
 
+# import sht31_i2c_xbee
+
+# addr = '\x00\x00\x00\x00\x00\x00\xFF\xFF'  # XBee ブロードキャストアドレス
 # addr = xbee.ADDR_BROADCAST # ブロードキャスト用のアドレス
 addr = xbee.ADDR_COORDINATOR  # cordinatorのアドレス
 
 xb = xbee.XBee()
 
 i2c = machine.I2C(1, freq=400000)
-sht = sht31_i2c_xbee.SHT31(i2c)
+sht21 = sht21_i2c_xbee.SHT21(i2c)
+# sht = sht31_i2c_xbee.SHT31(i2c)
 
 while True:
     status = xbee.atcmd('AI')  # ネットワーク参加状態を確認する
@@ -21,13 +26,16 @@ while True:
 
 print('\nJoined')
 
-polling_ms = 5 * 1000  # ネットワーク離脱防止用のポーリング間隔
+polling_ms = 10 * 1000  # ネットワーク離脱防止用のポーリング間隔(10秒でも大丈夫だった？)
 tr_interval_ms = 30 * 1000  # データ送信間隔
 tr_time = time.ticks_ms() - tr_interval_ms
 
+data = {"temp": None, "humid": None}
+
 while True:
-    # ネットワーク離脱防止用のpolling処理
+    # ネットワーク離脱防止用のpolling処理（要検討）
     status = xbee.atcmd('AI')  # ネットワーク参加状態を確認する(polling代わりの暫定案)
+    # print("status: {:x}".format(status))
 
     # XBeeスリープ
     sleep_time = polling_ms if polling_ms < tr_interval_ms else tr_interval_ms
@@ -38,13 +46,25 @@ while True:
     if delta < tr_interval_ms:
         continue
 
-    temp, humid = sht.read_temp_and_humid()
-    payload = str(temp) + ',' + str(humid)
+    # sht.turn_heater_off()
+    # print(sht.heater_status())
+
+    # payload = str(sht.read_temperature()) + ',' + str(sht.read_humidity())
+    temp = sht21.read_temperature()  # sht21
+    humid = sht21.read_humidity()  # sht21
+    # temp, humid = sht.read_temp_and_humid() # sht31
+
+    data["temp"] = temp
+    data["humid"] = humid
+
+    # payload = str(temp) + ',' + str(humid)
+    payload = json.dumps(data)  # JSON形式の文字列
+
     try:
         xbee.transmit(addr, payload)  # 取得値をXBeeで送信する
-        print('send:', payload)
+        # print('send:', payload)
         tr_time = time.ticks_ms()
     except OSError as e:
         print("OSError : {}".format(e))
-        time.sleep_ms(2000)  # 2秒間の待ち時間処理
+        time.sleep_ms(3000)  # 3秒間の待ち時間処理
         xbee.atcmd('FR')  # software rest (MycroPythonスクリプト再起動)
